@@ -6,7 +6,6 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
-
 const getAllVideos = asyncHandler(async (req, res) => {
   const {
     page = 1,
@@ -124,9 +123,25 @@ const getVideoById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Video not found");
   }
 
-  // Increase views whenever the video is successfully fetched
+  // Increase video views
   video.views += 1;
   await video.save();
+
+  // Add this video to the logged-in user's watch history
+  await User.findByIdAndUpdate(req.user._id, {
+    $pull: {
+      watchHistory: video._id,
+    },
+  });
+
+  await User.findByIdAndUpdate(req.user._id, {
+    $push: {
+      watchHistory: {
+        $each: [video._id],
+        $position: 0,
+      },
+    },
+  });
 
   return res
     .status(200)
