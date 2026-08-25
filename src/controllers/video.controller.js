@@ -5,6 +5,8 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { Like } from "../models/like.model.js";
+import { Subscription } from "../models/subscription.model.js";
 
 const getAllVideos = asyncHandler(async (req, res) => {
   const {
@@ -127,7 +129,7 @@ const getVideoById = asyncHandler(async (req, res) => {
   video.views += 1;
   await video.save();
 
-  // Add this video to the logged-in user's watch history
+  // Add video to logged-in user's watch history
   await User.findByIdAndUpdate(req.user._id, {
     $pull: {
       watchHistory: video._id,
@@ -143,9 +145,39 @@ const getVideoById = asyncHandler(async (req, res) => {
     },
   });
 
+  // Count total likes on this video
+  const likesCount = await Like.countDocuments({
+    video: video._id,
+  });
+
+  // Check whether current user has liked this video
+  const existingLike = await Like.findOne({
+    video: video._id,
+    likedBy: req.user._id,
+  });
+
+  // Check whether current user has subscribed to the owner
+  const existingSubscription = await Subscription.findOne({
+    subscriber: req.user._id,
+    channel: video.owner._id,
+  });
+
+  const videoData = {
+    ...video.toObject(),
+
+    likesCount,
+
+    isLiked: Boolean(existingLike),
+
+    owner: {
+      ...video.owner.toObject(),
+      isSubscribed: Boolean(existingSubscription),
+    },
+  };
+
   return res
     .status(200)
-    .json(new ApiResponse(200, video, "Video fetched successfully"));
+    .json(new ApiResponse(200, videoData, "Video fetched successfully"));
 });
 
 const updateVideo = asyncHandler(async (req, res) => {

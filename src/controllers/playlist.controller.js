@@ -90,66 +90,23 @@ const getPlaylistById = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid playlist ID");
   }
 
-  const playlist = await Playlist.aggregate([
-    {
-      $match: {
-        _id: new mongoose.Types.ObjectId(playlistId),
+  const playlist = await Playlist.findById(playlistId)
+    .populate("owner", "username fullName avatar")
+    .populate({
+      path: "videos",
+      populate: {
+        path: "owner",
+        select: "username fullName avatar",
       },
-    },
-    {
-      $lookup: {
-        from: "users",
-        localField: "owner",
-        foreignField: "_id",
-        as: "owner",
-      },
-    },
-    {
-      $unwind: "$owner",
-    },
-    {
-      $lookup: {
-        from: "videos",
-        localField: "videos",
-        foreignField: "_id",
-        as: "videos",
-      },
-    },
-    {
-      $project: {
-        name: 1,
-        description: 1,
-        createdAt: 1,
-        updatedAt: 1,
-        owner: {
-          _id: "$owner._id",
-          username: "$owner.username",
-          fullName: "$owner.fullName",
-          avatar: "$owner.avatar",
-        },
-        videos: {
-          _id: 1,
-          videoFile: 1,
-          thumbnail: 1,
-          title: 1,
-          description: 1,
-          duration: 1,
-          views: 1,
-          isPublished: 1,
-          owner: 1,
-          createdAt: 1,
-        },
-      },
-    },
-  ]);
+    });
 
-  if (!playlist.length) {
+  if (!playlist) {
     throw new ApiError(404, "Playlist not found");
   }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, playlist[0], "Playlist fetched successfully"));
+    .json(new ApiResponse(200, playlist, "Playlist fetched successfully"));
 });
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
